@@ -1,9 +1,10 @@
-module SunGiffer
-  # References:
-  #   http://aa.quae.nl/en/reken/zonpositie.html
-  #   http://en.wikipedia.org/wiki/Sunrise_equation
-  #   http://users.electromagnetic.net/bu/astro/sunrise-set.php
-  class SunCalculator
+module Solarity
+  class SunDay
+    # References:
+    #   http://aa.quae.nl/en/reken/zonpositie.html
+    #   http://en.wikipedia.org/wiki/Sunrise_equation
+    #   http://users.electromagnetic.net/bu/astro/sunrise-set.php
+
     attr_reader :j_date, :l_w, :phi
 
     # @param time [Time]
@@ -16,13 +17,20 @@ module SunGiffer
       @phi = phi
     end
 
-    def sun_rise
+    def rise
       DateTime.jd(chronological_jd(j_rise))
     end
 
-    def sun_set
+    def set
       DateTime.jd(chronological_jd(j_set))
     end
+
+    # because Ruby's DateTime.jd method takes chronological Julian dates
+    def chronological_jd(jd)
+      jd + 0.5
+    end
+
+    ### Equations for sun event calculations
 
     # current julian cycle
     def n
@@ -76,10 +84,7 @@ module SunGiffer
       j_transit - (j_set - j_transit)
     end
 
-    # because Ruby's DateTime.jd method takes chronological Julian dates
-    def chronological_jd(jd)
-      jd + 0.5
-    end
+    ### Helpers for doing maths
 
     def acos(x)
       deg(Math.acos(x))
