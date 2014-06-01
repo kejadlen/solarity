@@ -17,11 +17,11 @@ module SunGiffer
     end
 
     def sun_rise
-      DateTime.jd(j_rise + 0.5)
+      DateTime.jd(chronological_jd(j_rise))
     end
 
     def sun_set
-      DateTime.jd(j_set + 0.5)
+      DateTime.jd(chronological_jd(j_set))
     end
 
     # current julian cycle
@@ -74,6 +74,11 @@ module SunGiffer
     # sunrise
     def j_rise
       j_transit - (j_set - j_transit)
+    end
+
+    # because Ruby's DateTime.jd method takes chronological Julian dates
+    def chronological_jd(jd)
+      jd + 0.5
     end
 
     def acos(x)
