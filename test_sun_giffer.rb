@@ -3,27 +3,46 @@ require 'minitest/autorun'
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 require 'sun_giffer'
 
-class TestSunGiffer < Minitest::Test
+class TestSunCalculator < Minitest::Test
+  attr_reader :sun_calc
+
   def setup
-    @time = Time.parse('1 April 2004 12:00 UTC')
-    @l_w = -5
-    @phi = 52
+    @sun_calc = SunGiffer::SunCalculator.new(
+      time: Time.parse('1 April 2004 12:00 UTC'),
+      l_w: -5,
+      phi: 52
+    )
   end
 
-  def test_t_transit
-    assert_in_delta(11*60 + 45, SunGiffer.t_transit(l_w: @l_w, date: @time), 1)
-    p SunGiffer.t_rise(l_w: @l_w, phi: @phi, date: @time).divmod(60)
+  def test_sun_set
+    assert_in_delta(
+      DateTime.parse('1 April 2004 18:15 UTC'),
+      sun_calc.sun_set,
+      0.001
+    )
   end
 
-  def test_mean_anomaly
-    assert_in_delta(87.1807, SunGiffer.mean_anomaly(date: @time), 0.01)
+  def test_j_date
+    assert_equal(2453097, sun_calc.j_date)
   end
 
-  def test_l_sun
-    assert_in_delta(10.1179, SunGiffer.l_sun(date: @time), 0.01)
+  def test_n
+    assert_equal(1552, sun_calc.n)
   end
 
-  def test_hour_angle
-    assert_in_delta(97.4785, SunGiffer.hour_angle(phi: @phi), 0.01)
+  def test_m
+    assert_in_delta(87.1807, sun_calc.m, 0.05)
+  end
+
+  def test_w_0
+    assert_in_delta(97.4785, sun_calc.w_0, 0.01)
+  end
+
+  def test_j_transit
+    assert_in_delta(2453096.9895, sun_calc.j_transit, 0.01)
+  end
+
+  def test_j_set
+    assert_in_delta(2453097.2606, sun_calc.j_set, 0.01)
   end
 end

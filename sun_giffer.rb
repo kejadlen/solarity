@@ -1,61 +1,103 @@
 module SunGiffer
-  include Math
-  extend self
+  # References:
+  #   http://aa.quae.nl/en/reken/zonpositie.html
+  #   http://en.wikipedia.org/wiki/Sunrise_equation
+  #   http://users.electromagnetic.net/bu/astro/sunrise-set.php
+  class SunCalculator
+    attr_reader :j_date, :l_w, :phi
 
-  # Simplified assuming we're on the Earth and are looking for the Sun.
-  #
-  # Formulae taken from here: http://aa.quae.nl/en/reken/zonpositie.html
-  #
-  # Seattle: 47.6097° N, 122.3331° W
+    # @param time [Time]
+    # @param l_w [Integer] west longitude in degrees
+    # @param phi [Integer] north latitude in degrees
+    def initialize(time: nil, l_w:, phi:)
+      time ||= Time.now
+      @j_date = time.to_datetime.ajd
+      @l_w = l_w.to_f
+      @phi = phi
+    end
 
-  # trise ≈ ttransit − H/15° ≈ 6h00m + lw/15° + 24 * (J₀ + J₁ sin M + J₂ sin 2 LSun) − (H₁ tan φ sin LSun + H₃ tan φ (3 + (tan φ)²) (sin LSun)³)/15° 
-  #       = 6h01m + lw/15° + 7.6m sin M − 9.9m sin 2 LSun − (1h31m tan φ sin LSun + 2.2m tan φ (3 + (tan φ)²) (sin LSun)³ + ∆H/15°)
-  def t_rise(l_w:, phi:, date:)
-    t_transit(l_w: l_w, date: date) - hour_angle(phi: phi) / 15
-  end
+    def sun_rise
+      DateTime.jd(j_rise + 0.5)
+    end
 
-  # tset ≈ ttransit + H/15° ≈ 18h00m + lw/15° + 24 * (J₀ + J₁ sin M + J₂ sin 2 LSun) + (H₁ tan φ sin LSun + H₃ tan φ (3 + (tan φ)²) (sin LSun)³)/15°
-  #      = 18h01m + lw/15° + 7.6m sin M − 9.9m sin 2 LSun + (1h31m tan φ sin LSun + 2.2m tan φ (3 + (tan φ)²) (sin LSun)³ + ∆H/15°)
+    def sun_set
+      DateTime.jd(j_set + 0.5)
+    end
 
-  # ttransit ≈ 12h00m + lw/15° + 24 * (J₀ + J₁ sin M + J₂ sin 2 LSun)
-  #          = 12h01m + lw/15° + 7.6m sin M − 9.9m sin 2 LSun
-  def t_transit(l_w:, date:)
-    p ((12*60 + 1) + 60*((l_w/15.0) % 1)).divmod(60)
-    p 7.6*sin(rad(mean_anomaly(date: date)))
-    p l_sun(date: date)
-    p 9.9*sin(rad(2*l_sun(date: date)))
-    p 7.6*sin(rad(mean_anomaly(date: date))) - 9.9*sin(rad(2*l_sun(date: date)))
-    (12*60 + 1) + 60*((l_w/15.0) % 1) + 7.6*sin(rad(mean_anomaly(date: date))) - 9.9*sin(rad(2*l_sun(date: date)))
-  end
+    # current julian cycle
+    def n
+      (j_date - 2451545.0009 - l_w/360).floor
+    end
 
-  # M = M₀ + M₁*(J − J2000)
-  # J2000 = 2451545
-  def mean_anomaly(date:)
-    j = date.to_datetime.ajd
-    j_2000 = 2451545
-    (357.5291 + 0.98560028 * (j - j_2000)) % 360
-  end
+    # approximate solar noon
+    def j_star
+      2451545.0009 + l_w/360 + n
+    end
 
-  # Lsun = M + Π + 180°
-  def l_sun(date:)
-    (mean_anomaly(date: date) + 102.9372 + 180) % 360
-  end
+    # solar mean anomaly
+    def m
+      j_2000 = 2451545
+      (357.5291 + 0.98560028*(j_star - 2451545.0009)) % 360
+    end
 
-  # H = arccos((sin h₀ − sin φ sin δ)/(cos φ cos δ))
-  # h₀ = -0.83
-  # δSun = 4.7585°
-  def hour_angle(phi:)
-    phi = rad(phi)
-    h_0 = rad(-0.83)
-    delta = rad(4.7585)
-    deg(acos((sin(h_0) - (sin(phi)*sin(delta)))/(cos(phi)*cos(delta))))
-  end
+    # equation of center
+    def c
+      1.9148*sin(m) + 0.02*sin(2*m) + 0.0003*sin(3*m)
+    end
 
-  def rad(degree)
-    (PI * degree / 180) % (2*PI)
-  end
+    # ecliptical longitude
+    def λ
+      (m + 102.9372 + c + 180) % 360
+    end
 
-  def deg(radian)
-    (180 * radian / PI) % 360
+    # solar transit
+    def j_transit
+      j_star + 0.0053*sin(m) - 0.0069*sin(2*λ)
+    end
+
+    # declination of sun
+    def 𝛿
+      asin(sin(λ) * sin(23.45))
+    end
+
+    # hour angle
+    def w_0
+      # TODO Implement elevation? Add (-1.15*sqrt(elevation in feet)/60) to -0.83
+      acos((sin(-0.83) - sin(phi)*sin(𝛿)) / (cos(phi)*cos(𝛿)))
+    end
+
+    # sunset
+    def j_set
+      2451545.0009 + (w_0+l_w)/360 + n + 0.0053*sin(m) - 0.0069*sin(2*λ)
+    end
+
+    # sunrise
+    def j_rise
+      j_transit - (j_set - j_transit)
+    end
+
+    def acos(x)
+      deg(Math.acos(x))
+    end
+
+    def asin(x)
+      deg(Math.asin(x))
+    end
+
+    def cos(x)
+      Math.cos(rad(x))
+    end
+
+    def sin(x)
+      Math.sin(rad(x))
+    end
+
+    def rad(degree)
+      (Math::PI * degree / 180) % (2*Math::PI)
+    end
+
+    def deg(radian)
+      (180 * radian / Math::PI) % 360
+    end
   end
 end
