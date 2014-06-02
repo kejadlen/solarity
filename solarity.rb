@@ -5,29 +5,33 @@ module Solarity
     #   http://en.wikipedia.org/wiki/Sunrise_equation
     #   http://users.electromagnetic.net/bu/astro/sunrise-set.php
 
+    def self.next_event(time:, lat:, long:)
+      time = time.to_datetime
+    end
+
+    # Retuns a DateTime given an astronomical Julidan date
+    def self.jd(j_date)
+      # Add 0.5 since Ruby's DateTime.jd uses chronological Julian dates
+      DateTime.jd(j_date + 0.5)
+    end
+
     attr_reader :j_date, :l_w, :phi
 
-    # @param time [Time]
-    # @param l_w [Integer] west longitude in degrees
-    # @param phi [Integer] north latitude in degrees
-    def initialize(time: nil, l_w:, phi:)
-      time ||= Time.now
+    # @param time [Time] in UTC
+    # @param long [Integer] west longitude in degrees
+    # @param lat [Integer] north latitude in degrees
+    def initialize(time:, lat:, long:)
       @j_date = time.to_datetime.ajd
-      @l_w = l_w.to_f
-      @phi = phi
+      @phi = lat
+      @l_w = long.to_f # since we use this as a numerator
     end
 
     def rise
-      DateTime.jd(chronological_jd(j_rise))
+      self.class.jd(j_rise)
     end
 
     def set
-      DateTime.jd(chronological_jd(j_set))
-    end
-
-    # because Ruby's DateTime.jd method takes chronological Julian dates
-    def chronological_jd(jd)
-      jd + 0.5
+      self.class.jd(j_set)
     end
 
     ### Equations for sun event calculations
