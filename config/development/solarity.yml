@@ -1,0 +1,2 @@
+camera_cmd: imagesnap
+camera_cmd_args: -q %{path}
