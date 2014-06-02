@@ -1,7 +1,7 @@
 require 'minitest/autorun'
 
 $LOAD_PATH.unshift(File.dirname(__FILE__))
-require 'solarity'
+require 'sun_day'
 include Solarity
 
 class TestSunDay < Minitest::Test
