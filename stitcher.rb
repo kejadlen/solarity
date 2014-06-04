@@ -1,3 +1,5 @@
+require 'util'
+
 module Solarity
 
   module Stitcher
