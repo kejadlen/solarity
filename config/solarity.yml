@@ -1,0 +1,2 @@
+stitch_cmd: ffmpeg
+stitch_cmd_args: "-i %{input_path_pattern} -r 24 -vcodec mpeg4 -q:v 1 -s 640x480 %{output_path}"

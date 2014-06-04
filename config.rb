@@ -12,7 +12,6 @@ module Solarity
       if File.exists?(env_config_path)
         @config.merge!(YAML.load_file(env_config_path) || {})
         puts "Using config file: #{ env_config_path }"
-        puts @config.inspect
       end
     end
 
