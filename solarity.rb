@@ -4,14 +4,12 @@ require_relative 'sun_day'
 
 module Solarity
   class Daemon
-    attr_reader :buffer, :span, :interval, :lat, :long
+    attr_reader :buffer, :calendar, :interval
 
-    def initialize(buffer:, span:, interval:, lat:, long:)
+    def initialize(buffer:, calendar:, interval:)
       @buffer = buffer
-      @span = span
+      @calendar = calendar
       @interval = interval
-      @lat = lat
-      @long = long
     end
 
     def run
@@ -20,8 +18,7 @@ module Solarity
       while true
         cleanup
 
-        # event = next_event
-        event = ((Time.now+5)..(Time.now+5+span))
+        event = calendar.next_event
 
         wait_for_event(event)
 
@@ -35,6 +32,8 @@ module Solarity
 
     def init
       FileUtils.mkdir(buffer)
+    rescue Errno::EEXIST
+      # Purposeful no-op
     end
 
     def cleanup
@@ -42,12 +41,14 @@ module Solarity
     end
 
     def wait_for_event(event)
-      sleep(event.begin - Time.now)
+      until event.ongoing?
+        sleep(interval)
+      end
     end
 
     def take_time_lapse(event)
       i = 0
-      while event.cover?(Time.now)
+      while event.ongoing?
         path = "%s/%03d.jpg" % [buffer, i]
         exit_status = system("imagesnap #{path}")
         fail 'Unable to take photo' unless exit_status
@@ -64,27 +65,72 @@ module Solarity
 
     def post_time_lapse
     end
+  end
 
-    def next_event
-      today = SunDay.new(time: Time.now, lat: lat, long: long)
-      tomorrow = SunDay.new(time: Time.now + 24*60*60, lat: lat, long: long)
+  class Calendar
+    ONE_DAY = 24*60*60
+
+    attr_reader :span, :lat, :long
+
+    def initialize(span:, lat:, long:)
+      @span = span
+      @lat = lat
+      @long = long
+    end
+
+    def next_event(time=nil)
+      time ||= Time.now
+      today = SunDay.new(time: time, lat: lat, long: long)
+      tomorrow = SunDay.new(time: time + ONE_DAY, lat: lat, long: long)
 
       events = today.events + tomorrow.events
       events.map! {|e| ((e-span)..(e+span)) }
 
-      events.find {|e| e.begin > Time.now }
+      Event.new(events.find {|e| e.begin > time })
+    end
+  end
+
+  class Event
+    attr_reader :range
+
+    def initialize(range)
+      @range = range
+    end
+
+    def start_time
+      range.begin
+    end
+
+    def stop_time
+      range.end
+    end
+
+    def ongoing?(time=nil)
+      time ||= Time.now
+      range.cover?(time)
+    end
+
+    def over?(time=nil)
+      time ||= Time.now
+      stop_time < time
     end
   end
 end
 
 if __FILE__ == $0
-  # span: 60*60, # 1 hour
-  # interval: 15, # 15 seconds
+  require 'ostruct'
+
+  # calendar = Solarity::Calendar.new(
+  #   span: 60*60, # 1 hour
+  #   lat: 47.6097,
+  #   long: 122.3331,
+  # )
+  calendar = OpenStruct.new(
+    next_event: Solarity::Event.new(((Time.now+5)..(Time.now+5+60)))
+  )
   Solarity::Daemon.new(
     buffer: File.expand_path('../buffer', __FILE__),
-    span: 60,
+    calendar: calendar,
     interval: 2,
-    lat: 47.6097,
-    long: 122.3331,
   ).run
 end
