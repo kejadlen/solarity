@@ -3,23 +3,25 @@ require 'fileutils'
 require_relative 'sun_day'
 
 module Solarity
-  module Daemon
-    BUFFER = File.expand_path('../buffer', __FILE__)
-    # SPAN = 60*60 # 1 hour
-    # INTERVAL = 15 # 15 seconds
-    SPAN = 60
-    INTERVAL = 2
-    LAT = 47.6097
-    LONG = 122.3331
+  class Daemon
+    attr_reader :buffer, :span, :interval, :lat, :long
 
-    def self.run
+    def initialize(buffer:, span:, interval:, lat:, long:)
+      @buffer = buffer
+      @span = span
+      @interval = interval
+      @lat = lat
+      @long = long
+    end
+
+    def run
       init
 
       while true
         cleanup
 
         # event = next_event
-        event = ((Time.now+5)..(Time.now+5+SPAN))
+        event = ((Time.now+5)..(Time.now+5+span))
 
         wait_for_event(event)
 
@@ -31,46 +33,44 @@ module Solarity
       end
     end
 
-    def self.init
-      # FileUtils.mkdir(BUFFER)
+    def init
+      FileUtils.mkdir(buffer)
     end
 
-    def self.cleanup
-      FileUtils.rm(Dir["#{BUFFER}/*"])
+    def cleanup
+      FileUtils.rm(Dir["#{buffer}/*"])
     end
 
-    def self.wait_for_event(event)
-      # sleep(event.begin - Time.now)
-      sleep(10)
+    def wait_for_event(event)
+      sleep(event.begin - Time.now)
     end
 
-    def self.take_time_lapse(event)
+    def take_time_lapse(event)
       i = 0
       while event.cover?(Time.now)
-        # path = "#{BUFFER}/#{Time.now.strftime('%Y%m%d%H%M%S.jpg')}"
-        path = "%s/%03d.jpg" % [BUFFER, i]
-        exit_status = system("imagesnap -q #{path}")
+        path = "%s/%03d.jpg" % [buffer, i]
+        exit_status = system("imagesnap #{path}")
         fail 'Unable to take photo' unless exit_status
-        sleep(INTERVAL)
+        sleep(interval)
         i += 1
       end
     end
 
-    def self.process_time_lapse
-      cmd = "ffmpeg -i #{BUFFER}/%03d.jpg -r 24 -vcodec mpeg4 -q:v 1 -s 640x480 #{BUFFER}/out.avi"
+    def process_time_lapse
+      cmd = "ffmpeg -i #{buffer}/%03d.jpg -r 24 -vcodec mpeg4 -q:v 1 -s 640x480 #{buffer}/out.avi"
       exit_status = system(cmd)
       fail 'Unable to create video' unless exit_status
     end
 
-    def self.post_time_lapse
+    def post_time_lapse
     end
 
-    def self.next_event
-      today = SunDay.new(time: Time.now, lat: LAT, long: LONG)
-      tomorrow = SunDay.new(time: Time.now + 24*60*60, lat: LAT, long: LONG)
+    def next_event
+      today = SunDay.new(time: Time.now, lat: lat, long: long)
+      tomorrow = SunDay.new(time: Time.now + 24*60*60, lat: lat, long: long)
 
       events = today.events + tomorrow.events
-      events.map! {|e| ((e-SPAN)..(e+SPAN)) }
+      events.map! {|e| ((e-span)..(e+span)) }
 
       events.find {|e| e.begin > Time.now }
     end
@@ -78,5 +78,13 @@ module Solarity
 end
 
 if __FILE__ == $0
-  Solarity::Daemon.run
+  # span: 60*60, # 1 hour
+  # interval: 15, # 15 seconds
+  Solarity::Daemon.new(
+    buffer: File.expand_path('../buffer', __FILE__),
+    span: 60,
+    interval: 2,
+    lat: 47.6097,
+    long: 122.3331,
+  ).run
 end
